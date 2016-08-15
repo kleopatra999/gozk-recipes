@@ -60,6 +60,11 @@ type ZKSession struct {
 }
 
 func NewZKSession(servers string, recvTimeout time.Duration, logger stdLogger) (*ZKSession, error) {
+	session, err := NewTimedOutZKSession(servers, recvTimeout, logger, 5 * time.Second)
+	return session, err
+}
+
+func NewTimedOutZKSession(servers string, recvTimeout time.Duration, logger stdLogger, connectTimeout time.Duration) (*ZKSession, error) {
 	conn, events, err := zookeeper.Dial(servers, recvTimeout)
 	if err != nil {
 		return nil, err
@@ -85,7 +90,7 @@ func NewZKSession(servers string, recvTimeout time.Duration, logger stdLogger) (
 		if event.State != zookeeper.STATE_CONNECTED {
 			return nil, ErrZKSessionNotConnected
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(connectTimeout):
 		return nil, ErrZKSessionNotConnected
 	}
 
