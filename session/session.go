@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"time"
+	"fmt"
 
 	"github.com/Shopify/gozk"
 )
@@ -96,13 +97,23 @@ func newZKSession(servers string, recvTimeout time.Duration, logger stdLogger, c
 	}
 
 	var event zookeeper.Event
-	select {
-	case event = <-events:
-		if event.State == zookeeper.STATE_AUTH_FAILED || event.State == zookeeper.STATE_EXPIRED_SESSION {
+	for {
+		select {
+		case event = <-events:
+			fmt.Println(event)
+			switch event.State {
+				case zookeeper.STATE_AUTH_FAILED:
+					return nil, ErrZKSessionNotConnected
+				case zookeeper.STATE_EXPIRED_SESSION:
+					return nil, ErrZKSessionNotConnected
+				case zookeeper.STATE_CONNECTED:
+					break
+			}
+			break
+		case <-time.After(5 * time.Second):
 			return nil, ErrZKSessionNotConnected
 		}
-	case <-time.After(5 * time.Second):
-		return nil, ErrZKSessionNotConnected
+		break
 	}
 
 	go s.manage()
@@ -129,6 +140,7 @@ func (s *ZKSession) manage() {
 	for {
 		select {
 		case event := <-s.events:
+			fmt.Println(event)
 			switch event.State {
 			case zookeeper.STATE_EXPIRED_SESSION:
 				expired = true
